@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Idea Engine for YouTube</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600;800&display=swap">
+<style>
+:root{--bg:#eceff4;--ink:#10151f;--mute:#5b6577;--line:#d3d9e3;--card:#fff;--accent:#d92d20;--chip:#dfe4ec}
+@media (prefers-color-scheme:dark){:root{--bg:#0f131b;--ink:#eef1f6;--mute:#9aa4b6;--line:#262d3b;--card:#171c27;--accent:#ff6a5c;--chip:#222a39}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.5 "Bricolage Grotesque",system-ui,sans-serif}
+main{max-width:860px;margin:0 auto;padding:48px 20px 80px}
+h1{font-size:clamp(2.2rem,6vw,3.6rem);line-height:1;letter-spacing:-.03em;font-weight:800;margin:0 0 12px}
+h1 em{font-style:normal;color:var(--accent)}
+.sub{color:var(--mute);max-width:52ch;margin:0 0 28px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:20px}
+.chip,button{font:inherit;border:0;border-radius:99px;padding:6px 14px;background:var(--chip);color:var(--ink);cursor:pointer}
+.chip[aria-pressed=true]{background:var(--ink);color:var(--bg)}
+button.primary{background:var(--accent);color:#fff;font-weight:600;margin-left:auto}
+button:focus-visible,.chip:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+input{font:inherit;width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);margin-bottom:14px}
+ul{list-style:none;margin:0;padding:0}
+li{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin-bottom:10px;display:grid;grid-template-columns:1fr auto;gap:4px 16px}
+li h2{font-size:1.15rem;margin:0;font-weight:600;line-height:1.3}
+li p{margin:0;color:var(--mute);grid-column:1}
+.meta{font-size:.85rem;color:var(--mute);grid-column:1}
+li button{grid-row:1/3;grid-column:2;align-self:start}
+.status{color:var(--mute);font-size:.9rem;margin:0 0 14px}
+.sf{display:flex;gap:8px;margin-bottom:14px}.sf input{margin:0}.sf button.primary{margin-left:0;white-space:nowrap}
+.tabs{display:flex;gap:18px;margin-bottom:28px}.tabs a{color:var(--mute);text-decoration:none;font-weight:600;padding-bottom:4px}.tabs a[aria-current]{color:var(--ink);border-bottom:2px solid var(--accent)}
+.pick{grid-column:1;color:var(--mute);margin-top:6px;cursor:pointer}.pick input{width:auto;margin:0 6px 0 0;padding:0;display:inline}.barfix{position:fixed;left:0;right:0;bottom:0;display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:center;padding:12px 16px;background:var(--card);border-top:1px solid var(--line);z-index:5}.barfix[hidden]{display:none}.barfix input{width:auto;margin:0 0 0 6px;padding:6px 8px;border-radius:8px}.barfix button.primary{margin-left:0}
+.barfix select{font:inherit;padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink)}
+</style>
+</head>
+<body>
+<main>
+  <nav class="tabs"><a href="/" aria-current="page">Ideas</a><a href="/queue.html">Queue</a></nav>
+  <h1>What should you film <em>this week?</em></h1>
+  <p class="sub">Fresh video ideas built from what people are searching on YouTube and Google right now. Rechecked every Monday and Thursday.</p>
+  <form id="sf" class="sf"><input id="q" type="search" placeholder="Search any topic, e.g. ai agents for lawyers" aria-label="Search topic"><button class="primary" type="submit">Search trends</button></form>
+  <div class="bar" id="chips"></div>
+  <p class="status" id="status" aria-live="polite">Loading ideas…</p>
+  <ul id="list"></ul>
+</main>
+<div id="bar" class="barfix" hidden><span id="cnt"></span>
+  <label>Schedule <select id="mode"><option value="slots">Daily time slots</option><option value="gap">Every N hours</option></select></label>
+  <label id="slotsL">Post at <input id="slots" value="09:00, 14:00, 19:00" style="width:200px" aria-label="Daily post times, 24-hour, separated by commas"></label>
+  <label id="gapL" hidden>Every <input id="gap" type="number" min="1" max="168" value="24" style="width:70px"> hours</label>
+  <label>Start from <input id="first" type="datetime-local"></label>
+  <button class="primary" id="make">Make videos</button>
+  <div id="prev" style="flex-basis:100%;text-align:center;color:var(--mute);font-size:.9rem"></div></div>
+<script>
+let data=null, trend=null, pillar="all", mode="trend", lastItems=[];
+const picked=new Map();
+const $=id=>document.getElementById(id);
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fresh=(d,ms)=>d?.updatedAt&&Date.now()-new Date(d.updatedAt)<ms;
+
+async function fetchIdeas(q){const r=await fetch("/api/ideas"+(q?"?q="+encodeURIComponent(q):""));if(!r.ok)throw 0;return r.json()}
+async function poll(q,before,msg){
+  $("status").textContent=msg;
+  for(let n=0;n<30;n++){await sleep(4000);try{const d=await fetchIdeas(q);if(d.updatedAt&&d.updatedAt!==before)return d}catch{}}
+  return null;
+}
+async function init(){
+  try{trend=data=await fetchIdeas();render()}
+  catch{$("status").textContent="Couldn't load ideas. Check that your functions deployed, then try again.";return}
+  if(!fresh(trend,24*36e5))generate(); // auto-run when empty or older than a day
+}
+async function generate(force){
+  if(!force&&fresh(trend,10*6e4)){$("status").textContent="Trending ideas are already up to date.";return}
+  const before=trend?.updatedAt;
+  await fetch("/.netlify/functions/refresh-background"+(force?"?force=1":""),{method:"POST"});
+  const d=await poll("",before,"Finding what's trending now. This takes about a minute.");
+  if(!d){$("status").textContent="Still working. Reload in a minute or check the function log in Netlify.";return}
+  trend=d;if(mode==="trend"){data=d;render()}
+}
+async function search(q){
+  q=q.trim();if(!q)return;
+  mode="search";
+  const cur=await fetchIdeas(q).catch(()=>({}));
+  if(!fresh(cur,36e5)){
+    await fetch("/.netlify/functions/search-background",{method:"POST",body:JSON.stringify({q})});
+    const d=await poll(q,cur.updatedAt,`Searching trends for “${q}”…`);
+    if(!d){$("status").textContent="Search timed out. Try again in a minute.";return}
+    data=d;
+  }else data=cur;
+  render();
+}
+function render(){
+  if(mode==="search"){$("chips").innerHTML=`<button class="chip" id="back">← Back to trending</button>`}
+  else{
+    const pillars=["all",...new Set(data.ideas.map(i=>i.pillar))];
+    $("chips").innerHTML=pillars.map(s=>`<button class="chip" aria-pressed="${s===pillar}" data-s="${esc(s)}">${esc(s)}</button>`).join("")+`<button class="primary" id="gen">Refresh trending</button>`;
+  }
+  const f=mode==="trend"?$("q").value.toLowerCase():"";
+  const items=data.ideas.filter(i=>(mode==="search"||pillar==="all"||i.pillar===pillar)&&(i.title+i.query).toLowerCase().includes(f));
+  lastItems=items;
+  if(!data.ideas.length){$("status").textContent=mode==="search"?"No ideas found for that topic. Try broader wording.":"Finding what's trending now…";$("list").innerHTML="";return}
+  $("status").textContent=`${mode==="search"?`Results for “${esc(data.query)}” · `:""}${items.length} ideas · updated ${new Date(data.updatedAt).toLocaleString()} · ${data.ai?"picked and written by Gemini":"template titles"+(data.aiError?` · Gemini problem: ${esc(data.aiError)}`:"")}${data.trends?" · "+({live:"Google Trends: live",cached:"Google Trends: using saved data from "+(data.trends.ageText||"earlier")+" (live data was blocked)",unavailable:"Google Trends: unavailable right now (add SERPAPI_KEY for reliable data)"}[data.trends.status]||""):""}`;
+  $("list").innerHTML=items.map((i,n)=>`<li><h2>${esc(i.title)}</h2><button data-c="${n}">Copy</button>
+    <p>${esc(i.hook)}</p>${i.why?`<p>${esc(i.why)}</p>`:""}${i.short?`<p>Short: ${esc(i.short)}</p>`:""}
+    <span class="meta">${esc(i.signal)} · ${esc(i.format||"")}${i.thumbnail?` · thumbnail: “${esc(i.thumbnail)}”`:""} · from “${esc(i.query)}”</span><label class="pick"><input type="checkbox" data-p="${n}" ${picked.has(i.title)?"checked":""}> Make a video from this idea</label></li>`).join("");
+  $("list").onclick=e=>{const n=e.target.dataset.c;if(n==null)return;navigator.clipboard.writeText(items[n].title);e.target.textContent="Copied";setTimeout(()=>e.target.textContent="Copy",1200)};
+  $("chips").onclick=e=>{
+    if(e.target.dataset.s){pillar=e.target.dataset.s;render()}
+    if(e.target.id==="gen")generate(true);
+    if(e.target.id==="back"){mode="trend";data=trend;$("q").value="";render()}
+  };
+}
+$("sf").onsubmit=e=>{e.preventDefault();search($("q").value)};
+$("q").oninput=()=>{if(mode==="trend"&&data)render()};
+const d0=new Date();d0.setDate(d0.getDate()+1);d0.setHours(18,0,0,0);$("first").value=new Date(d0-d0.getTimezoneOffset()*6e4).toISOString().slice(0,16);
+function bar(){$("bar").hidden=!picked.size;$("cnt").textContent=picked.size+" selected";preview()}
+$("list").onchange=e=>{const n=e.target.dataset.p;if(n===undefined)return;const i=lastItems[n];e.target.checked?picked.set(i.title,i):picked.delete(i.title);bar()};
+// Assign videos to the next free daily slots (local time), starting from a chosen moment.
+function slotTimes(n,startMs,slots){
+  const out=[],base=new Date(startMs);base.setHours(0,0,0,0);
+  for(let d=0;out.length<n&&d<400;d++)for(const s of slots){
+    const [hh,mm]=s.split(":").map(Number),t=new Date(base);t.setDate(base.getDate()+d);t.setHours(hh,mm,0,0);
+    if(t.getTime()>=startMs&&out.length<n)out.push(t.toISOString());
+  }
+  return out;
+}
+function parseSlots(text){
+  const list=text.split(/[,\s]+/).filter(Boolean),ok=list.every(x=>/^([01]?\d|2[0-3]):[0-5]\d$/.test(x));
+  return ok&&list.length?[...new Set(list.map(x=>x.padStart(5,"0")))].sort():null;
+}
+function plan(){
+  const start=new Date($("first").value).getTime(),n=Math.max(picked.size,1);
+  if($("mode").value==="slots"){const sl=parseSlots($("slots").value);if(!sl||isNaN(start))return null;return {times:slotTimes(n,start,sl),perDay:sl.length}}
+  const gap=+$("gap").value||24;if(isNaN(start))return null;
+  return {times:Array.from({length:n},(_,k)=>new Date(start+k*gap*36e5).toISOString()),perDay:Math.round(24/gap*10)/10};
+}
+function preview(){
+  $("slotsL").hidden=$("mode").value!=="slots";$("gapL").hidden=$("mode").value==="slots";
+  const p=plan();
+  $("prev").textContent=p?`${p.perDay} per day: ${p.times.slice(0,4).map(t=>new Date(t).toLocaleString([],{weekday:"short",hour:"numeric",minute:"2-digit"})).join(", ")}${p.times.length>4?`, … (${p.times.length} videos)`:""}`:"Use 24-hour times like 09:00, 14:00, 19:00";
+}
+["mode","slots","gap","first"].forEach(id=>$(id).addEventListener("input",preview));
+$("mode").addEventListener("change",preview);
+$("make").onclick=async()=>{
+  const p=plan();
+  if(!p){alert("Check the post times: use 24-hour times like 09:00, 14:00, 19:00, and pick a start time.");return}
+  const ideas=[...picked.values()].slice(0,20).map(i=>({title:i.title,hook:i.hook,short:i.short,why:i.why,query:i.query,format:i.format,thumbnail:i.thumbnail,pillar:i.pillar}));
+  const body=JSON.stringify({ideas,times:p.times.slice(0,ideas.length)});
+  const go=()=>fetch("/api/queue",{method:"POST",headers:{"x-app-password":sessionStorage.pw||""},body});
+  let r=await go();
+  if(r.status===401){sessionStorage.pw=prompt("Admin password")||"";r=await go()}
+  if(!r.ok){alert((await r.json()).error);return}
+  location.href="/queue.html";
+};
+init();
+</script>
+</body>
+</html>

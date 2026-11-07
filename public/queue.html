@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Queue · Idea Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600;800&display=swap">
+<style>
+:root{--bg:#eceff4;--ink:#10151f;--mute:#5b6577;--line:#d3d9e3;--card:#fff;--accent:#d92d20;--chip:#dfe4ec}
+@media (prefers-color-scheme:dark){:root{--bg:#0f131b;--ink:#eef1f6;--mute:#9aa4b6;--line:#262d3b;--card:#171c27;--accent:#ff6a5c;--chip:#222a39}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.5 "Bricolage Grotesque",system-ui,sans-serif}
+main{max-width:860px;margin:0 auto;padding:48px 20px 80px}
+h1{font-size:clamp(2.2rem,6vw,3.6rem);line-height:1;letter-spacing:-.03em;font-weight:800;margin:0 0 12px}
+h1 em{font-style:normal;color:var(--accent)}
+.sub{color:var(--mute);max-width:52ch;margin:0 0 28px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:20px}
+.chip,button{font:inherit;border:0;border-radius:99px;padding:6px 14px;background:var(--chip);color:var(--ink);cursor:pointer}
+.chip[aria-pressed=true]{background:var(--ink);color:var(--bg)}
+button.primary{background:var(--accent);color:#fff;font-weight:600;margin-left:auto}
+button:focus-visible,.chip:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+input{font:inherit;width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);margin-bottom:14px}
+ul{list-style:none;margin:0;padding:0}
+li{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin-bottom:10px;display:grid;grid-template-columns:1fr auto;gap:4px 16px}
+li h2{font-size:1.15rem;margin:0;font-weight:600;line-height:1.3}
+li p{margin:0;color:var(--mute);grid-column:1}
+.meta{font-size:.85rem;color:var(--mute);grid-column:1}
+li button{grid-row:1/3;grid-column:2;align-self:start}
+.status{color:var(--mute);font-size:.9rem;margin:0 0 14px}
+.sf{display:flex;gap:8px;margin-bottom:14px}.sf input{margin:0}.sf button.primary{margin-left:0;white-space:nowrap}
+.tabs{display:flex;gap:18px;margin-bottom:28px}.tabs a{color:var(--mute);text-decoration:none;font-weight:600;padding-bottom:4px}.tabs a[aria-current]{color:var(--ink);border-bottom:2px solid var(--accent)}
+.pick{grid-column:1;color:var(--mute);margin-top:6px;cursor:pointer}.pick input{width:auto;margin:0 6px 0 0;padding:0;display:inline}.barfix{position:fixed;left:0;right:0;bottom:0;display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:center;padding:12px 16px;background:var(--card);border-top:1px solid var(--line);z-index:5}.barfix[hidden]{display:none}.barfix input{width:auto;margin:0 0 0 6px;padding:6px 8px;border-radius:8px}.barfix button.primary{margin-left:0}
+.v{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin-bottom:14px}.v h2{margin:0 0 4px;font-size:1.1rem}.st{font-weight:600}.st.ready{color:#1a9d55}.st.failed{color:var(--accent)}.acts{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}.acts input{width:auto;margin:0;padding:6px 8px;border-radius:8px}video{width:100%;max-width:300px;border-radius:10px;margin-top:10px;background:#000;display:block}details{margin-top:10px;color:var(--mute)}details p{margin:6px 0}.err{color:var(--accent)}
+.tl{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:7px;font-size:.93rem}.tl li{display:flex;gap:10px;align-items:baseline;background:none;border:0;padding:0;margin:0;color:var(--mute)}.tl .dot{flex:none;width:11px;height:11px;border-radius:50%;border:2px solid var(--mute);position:relative;top:1px}.tl .done{color:var(--ink)}.tl .done .dot{background:#1a9d55;border-color:#1a9d55}.tl .now{color:var(--ink);font-weight:600}.tl .now .dot{background:var(--accent);border-color:var(--accent)}.tl .fail{color:var(--accent)}.tl .fail .dot{border-color:var(--accent);background:var(--accent)}.tl b{font-weight:600}
+.live{margin-left:auto;font-size:.82rem;color:var(--mute);display:flex;align-items:center;gap:6px}.live i{width:8px;height:8px;border-radius:50%;background:#1a9d55;display:inline-block}.live.off i{background:var(--accent)}.live.sync i{animation:pulse 1s infinite}@keyframes pulse{50%{opacity:.25}}
+.pb{height:8px;border-radius:99px;background:var(--chip);overflow:hidden;margin:10px 0 4px}.pb i{display:block;height:100%;background:var(--accent);border-radius:99px;transition:width .6s ease}.pbt{font-size:.85rem;color:var(--mute)}.warn{color:var(--accent)}
+.v{transition:opacity .2s}.v.leaving{opacity:.35;pointer-events:none}.v [data-r=acts]:empty,.v [data-r=media]:empty,.v [data-r=details]:empty{display:none}
+</style>
+</head>
+<body>
+<main>
+  <nav class="tabs"><a href="/">Ideas</a><a href="/queue.html" aria-current="page">Queue</a><span class="live" id="live" role="status" title="This page updates by itself"><i></i><span>Live</span></span></nav>
+  <h1>Your video <em>queue.</em></h1>
+  <p class="sub">Videos are rendered, stored on Cloudinary, posted to YouTube at the scheduled time, then deleted from Cloudinary. Review a video here before it posts.</p>
+  <div class="v" id="yt" aria-live="polite">Checking YouTube connection…</div>
+  <div class="v" id="sum" hidden></div>
+  <p class="status" id="status" aria-live="polite"></p>
+  <div id="list"></div>
+</main>
+<script>
+let items=[],rev=null,timer=null,inflight=false,lastAct=Date.now();
+const pending=new Set(),gone=new Set(); // ids with a click in flight / removed on screen but not yet confirmed
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const arr=v=>Array.isArray(v)?v:typeof v==="string"?v.split(/[,;\n]+/).map(x=>x.trim()).filter(Boolean):[]; // older saved items may hold a string where a list belongs
+const local=iso=>{const d=new Date(iso);return new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,16)};
+const tz=Intl.DateTimeFormat().resolvedOptions().timeZone;
+const when=iso=>iso?new Date(iso).toLocaleString([],{weekday:"short",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}):"";
+const rel=iso=>{const d=new Date(iso)-Date.now(),m=Math.round(Math.abs(d)/6e4),h=Math.floor(m/60),dd=Math.floor(h/24);
+  const t=dd>=1?`${dd}d ${h%24}h`:h>=1?`${h}h ${m%60}m`:`${m}m`;return d>=0?`in ${t}`:`${t} ago`};
+const ago=iso=>{const s=Math.round((Date.now()-new Date(iso))/1e3);return s<10?"just now":s<90?`${s}s ago`:rel(iso)};
+// How long a rendering video has been silent, and whether that is long enough to worry about (the server fails it after 30 / 20 minutes).
+const dur=ms=>{const m=Math.round(ms/6e4);return m<120?`${m} minutes`:m<2880?`${Math.round(m/60)} hours`:`${Math.round(m/1440)} days`};
+const silent=i=>{const ref=i.workerSeenAt||i.dispatchedAt||i.createdAt;return ref?Date.now()-new Date(ref):0};
+const worried=i=>i.status==="rendering"&&!i.dispatchAt&&silent(i)>(i.workerSeenAt?6:10)*6e4;
+const runLink=i=>i.runUrl?` · <a href="${esc(i.runUrl)}" target="_blank" rel="noopener">view the GitHub run</a>`:"";
+// A progress bar for a render that is under way (the worker reports a percent and a heartbeat about every minute).
+function bar(i){
+  if(i.status!=="rendering"||i.dispatchAt||!i.workerSeenAt||i.stage==="queued"||typeof i.progress!=="number")return"";
+  return `<div class="pb" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${i.progress}"><i style="width:${i.progress}%"></i></div><div class="pbt">${i.progress}% · last update ${ago(i.workerSeenAt)}${runLink(i)}</div>`;
+}
+// One line per stage: sent > rendered > scheduled > posted > cleaned up, each with its time.
+const STG={script:"Writing the storyboard and script",voice:"Recording the voiceover",images:"Generating scene images",render:"Rendering the video",upload:"Uploading to Cloudinary",waiting:"Waiting to start",starting:"Starting the render server",queued:"Queued on the render server"};
+function timeline(i){
+  const s=i.status,li=(st,text,time)=>`<li class="${st}"><span class="dot"></span><span>${text}${time?` <b>${esc(time)}</b>`:""}</span></li>`;
+  const rendered=!!i.readyAt||["ready","posting","posted"].includes(s)||(s==="failed"&&!!i.cloudinary);
+  const overdue=new Date(i.publishAt)<=Date.now(),sched=`${when(i.publishAt)} (${rel(i.publishAt)})`;
+  const saved=arr(i.saved);
+  const out=[li("done","Sent for rendering",when(i.createdAt))];
+  if(rendered)out.push(li("done","Rendered and saved to Cloudinary",when(i.readyAt)));
+  else if(s==="failed")out.push(li("fail",i.renderStartedAt?`Failed${i.failedStage?` while ${(STG[i.failedStage]||i.failedStage).toLowerCase()}`:" during rendering"}`:"Failed before rendering started",when(i.failedAt||i.updatedAt)));
+  else if(i.dispatchAt)out.push(li("now",i.quotaUntil?"AI quota used up. Resumes by itself, continuing from what is saved:":"Retry scheduled. Starts",`${when(i.dispatchAt)} (${rel(i.dispatchAt)})`));
+  else if(i.workerSeenAt&&!i.renderStartedAt)out.push(li("now",`Queued on the render server${i.detail?` (${esc(i.detail)})`:""}`,"last update "+ago(i.workerSeenAt)));
+  else if(i.renderStartedAt)out.push(li("now",`${STG[i.stage]||"Rendering"}${i.detail?` (${esc(i.detail)})`:""}, started`,when(i.renderStartedAt)));
+  else out.push(li("now","Waiting for the render server to start (usually 1 to 2 minutes)","sent "+ago(i.dispatchedAt||i.createdAt)));
+  if(worried(i))out.push(li("fail",i.workerSeenAt?`No update from the render server for ${dur(silent(i))}. If it stays silent this video is marked failed so you can retry.${runLink(i)}`:`The render server hasn't reported in for ${dur(silent(i))}. Check the latest run in GitHub > Actions.${runLink(i)}`,""));
+  if(!rendered&&saved.length)out.push(li("done",`Saved: ${saved.map(esc).join(", ")}. ${s==="failed"?"Retry continues from here without redoing them.":"A failure would resume from here."}`,""));
+  if(s==="posted"||s==="posting")out.push(li("done","Was scheduled for",when(i.publishAt)));
+  else if(s==="ready")out.push(li("now",overdue?"Due now. It posts at the next check, within 15 minutes:":"Scheduled for",overdue?when(i.publishAt):sched));
+  else out.push(li("",s==="failed"&&!rendered?"Would have posted":"Scheduled for",sched));
+  if(s==="posted")out.push(li("done","Posted to YouTube",when(i.postedAt)));
+  else if(s==="posting")out.push(li("now","Posting to YouTube…",when(i.postingAt)));
+  else if(s==="failed"&&rendered)out.push(li("fail","Posting failed",when(i.failedAt||i.updatedAt)));
+  else out.push(li("","Post to YouTube",""));
+  if(s==="posted")out.push(i.cloudinaryDeleted?li("done","Deleted from Cloudinary",""):i.cleanupError?li("fail","Cloudinary cleanup failed (delete it in your Cloudinary dashboard)",""):li("now","Deleting from Cloudinary…",""));
+  else out.push(li("","Deleted from Cloudinary after posting",""));
+  return `<ol class="tl">${out.join("")}</ol>`;
+}
+const waiting=i=>i.status==="rendering"&&!!i.dispatchAt;
+function summary(){
+  const vis=items.filter(i=>!gone.has(i.id)),c=x=>vis.filter(i=>i.status===x).length,t=i=>new Date(i.publishAt);
+  const due=vis.filter(i=>i.status==="ready"&&t(i)<=Date.now());
+  const next=vis.filter(i=>["rendering","ready"].includes(i.status)&&t(i)>Date.now()).sort((x,y)=>t(x)-t(y))[0];
+  const w=vis.filter(waiting).length,parts=[`${c("rendering")-w} rendering`];if(w)parts.push(`${w} waiting to start`);parts.push(`${c("ready")} scheduled`,`${c("posted")} posted`);if(c("failed"))parts.push(`${c("failed")} failed`);
+  const html=`<b>${parts.join(" · ")}</b>`
+    +(due.length?`<p style="margin:6px 0 0">Due now: <b>${due.map(i=>esc(i.idea.title)).join(", ")}</b>. Posts at the next check, within 15 minutes.</p>`:"")
+    +(next?`<p style="margin:6px 0 0">Next scheduled: <b>${esc(next.idea.title)}</b> on ${when(next.publishAt)} (${rel(next.publishAt)})</p>`:"")
+    +`<p style="color:var(--mute);margin:6px 0 0">Times are in your time zone (${esc(tz)}). Videos post within 15 minutes after their scheduled time.</p>`;
+  $("sum").hidden=!vis.length;if($("sum")._h!==html){$("sum").innerHTML=html;$("sum")._h=html}
+}
+const label=i=>waiting(i)?(i.quotaUntil?"Paused: waiting for AI quota":"Waiting to retry…"):i.status==="rendering"&&typeof i.progress==="number"&&i.progress>0&&i.workerSeenAt&&i.stage!=="queued"?`Rendering… ${i.progress}%`:({rendering:"Rendering… (a few minutes each)",ready:"Ready, scheduled",posting:"Posting to YouTube…",posted:"Posted",failed:"Failed"}[i.status]||i.status);
+const busy=i=>["rendering","posting"].includes(i.status)&&Date.now()-new Date(i.updatedAt)<3*36e5;
+
+// Each card is split into regions that are updated independently, so a countdown ticking in the timeline never restarts the
+// video, closes the "Script and details" panel or wipes a time you are typing.
+function regions(i){
+  const posted=i.status==="posted",sc=arr(i.storyboard),pts=arr(i.points),tags=arr(i.hashtags),sv=arr(i.saved);
+  return {
+    head:`<h2>${esc(i.idea.title)}</h2>
+    <div class="st ${i.status}">${label(i)}${posted?` · ${new Date(i.postedAt).toLocaleString()} · <a href="https://youtube.com/shorts/${esc(i.youtubeId)}" target="_blank" rel="noopener">open on YouTube</a>${i.cloudinaryDeleted?" · deleted from Cloudinary":i.cleanupError?" · Cloudinary cleanup failed":""}`:""}</div>
+    ${bar(i)}${i.error?`<div class="err">${esc(i.error)}${i.status==="failed"?runLink(i):""}</div>`:""}${timeline(i)}`,
+    media:i.status==="ready"&&i.cloudinary?`<video controls preload="none" src="${esc(i.cloudinary.url)}"></video>`:"",
+    details:i.script?`<details><summary>Script and details</summary>${i.aiProvider?`<p>Script written by ${esc(i.aiProvider)}</p>`:""}${sc.length?`<p><b>Storyboard</b></p>${sc.map((x,k)=>`<p>${k+1}. ${esc(x)}</p>`).join("")}`:""}${i.imageInfo?`<p>${esc(i.imageInfo)}</p>`:""}<p><b>Script</b></p><p>${esc(i.script)}</p><p>On screen: ${pts.map(esc).join(" · ")}</p><p>${esc(i.caption)} ${tags.map(h=>"#"+esc(h)).join(" ")}</p></details>`:"",
+    acts:`${["rendering","ready","failed"].includes(i.status)?`<label>Posts at <input type="datetime-local" data-t value="${local(i.publishAt)}"></label><button data-a="save">Save time</button>`:""}
+      ${i.status==="ready"?'<button class="primary" data-a="now">Post now</button>':""}
+      ${waiting(i)?'<button class="primary" data-a="startnow">Start now</button>':""}
+      ${i.status==="failed"?`<button class="primary" data-a="retry">${sv.length&&!i.cloudinary?"Retry (continue)":"Retry"}</button>`:""}${i.status==="failed"&&!i.cloudinary&&sv.length?'<button data-a="restart">Start over</button>':""}
+      ${i.status!=="posting"?'<button data-a="del">Remove</button>':""}`
+  };
+}
+function setRegion(node,html,k){
+  if(node._h===html)return;
+  if(k==="acts"&&node.contains(document.activeElement)&&document.activeElement.matches("input"))return; // never overwrite a time you are typing
+  const open=k==="details"&&node.querySelector("details")?.open;
+  node.innerHTML=html;node._h=html;
+  if(open)node.querySelector("details").open=true;
+}
+const order={ready:0,rendering:1,posting:1,failed:2,posted:3};
+function render(){
+  summary();
+  const vis=items.filter(i=>!gone.has(i.id)),wrap=$("list");
+  $("status").textContent=vis.length?"":"Nothing here yet. On the Ideas tab, tick ideas and click Make videos.";
+  const keep=new Set(vis.map(i=>i.id));
+  [...wrap.children].forEach(el=>{if(!keep.has(el.dataset.id))el.remove()});
+  [...vis].sort((a,b)=>order[a.status]-order[b.status]||new Date(a.publishAt)-new Date(b.publishAt)).forEach((i,pos)=>{
+    let el=[...wrap.children].find(x=>x.dataset.id===i.id);
+    if(!el){el=document.createElement("section");el.className="v";el.dataset.id=i.id;el.innerHTML='<div data-r="head"></div><div data-r="media"></div><div data-r="details"></div><div data-r="acts" class="acts"></div>'}
+    const r=regions(i);for(const k of ["head","media","details","acts"])setRegion(el.querySelector(`[data-r=${k}]`),r[k],k);
+    el.classList.toggle("leaving",pending.has(i.id)&&gone.has(i.id));
+    if(wrap.children[pos]!==el)wrap.insertBefore(el,wrap.children[pos]||null);
+  });
+}
+
+// ---- talking to the server ----
+async function call(method,body,qs=""){
+  const go=()=>fetch("/api/queue"+qs,{method,headers:{"x-app-password":sessionStorage.pw||"","content-type":"application/json"},body:body?JSON.stringify(body):undefined});
+  try{
+    let r=await go();
+    if(r.status===401){sessionStorage.pw=prompt("Admin password")||"";r=await go()}
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok){alert(j.error||"Something went wrong");return j.item?{item:j.item,failed:true}:null}
+    return j;
+  }catch{alert("Couldn't reach the server. Check your connection and try again.");return null}
+}
+const put=it=>{const k=items.findIndex(x=>x.id===it.id);k<0?items.push(it):items[k]=it};
+// Update the screen first, then ask the server. If the server says no, put things back.
+async function act(id,optimistic,method,body,qs){
+  lastAct=Date.now();
+  const k=items.findIndex(x=>x.id===id),snap=k<0?null:{...items[k]};
+  pending.add(id);
+  if(optimistic==="remove")gone.add(id);else if(snap)items[k]={...snap,...optimistic,updatedAt:new Date().toISOString()};
+  render();
+  const j=await call(method,body,qs);
+  pending.delete(id);
+  if(!j||j.failed){gone.delete(id);if(snap)put(snap);if(j?.item)put(j.item)}
+  else if(optimistic==="remove"){items=items.filter(x=>x.id!==id);gone.delete(id)}
+  else if(j.item)put(j.item);
+  render();setLive("sync");setTimeout(sync,700);
+}
+$("list").onclick=e=>{
+  const b=e.target.closest("button[data-a]");if(!b)return;
+  const sec=b.closest("section"),id=sec.dataset.id,a=b.dataset.a,it=items.find(x=>x.id===id);if(!it||pending.has(id))return;
+  const later=new Date(Date.now()+5*6e4).toISOString();
+  if(a==="save"){const t=new Date(sec.querySelector("[data-t]").value);if(isNaN(t)){alert("Pick a date and time.");return}act(id,{publishAt:t.toISOString()},"PATCH",{id,publishAt:t.toISOString()})}
+  if(a==="now"&&confirm("Post this video to YouTube now?"))act(id,{status:"posting",postingAt:new Date().toISOString(),publishAt:new Date().toISOString()},"POST",{id,action:"postnow"});
+  if(a==="retry")act(id,{status:"rendering",error:null,stage:"waiting",detail:"Retry scheduled",dispatchAt:later,renderStartedAt:null,failedAt:null},"POST",{id,action:"retry"});
+  if(a==="startnow"&&(!it.quotaUntil||confirm("The AI quota may still be used up, so this could fail again. Start anyway?")))act(id,{dispatchAt:null,quotaUntil:null,stage:"starting",detail:""},"POST",{id,action:"startnow"});
+  if(a==="restart"&&confirm("Throw away the saved script and voiceover and rebuild everything from scratch?"))act(id,{status:"rendering",error:null,stage:"waiting",detail:"Restart scheduled",dispatchAt:later,saved:[],renderStartedAt:null},"POST",{id,action:"restart"});
+  if(a==="del"&&confirm("Remove this video? Its Cloudinary file is deleted too."))act(id,"remove","DELETE",null,"?id="+id);
+};
+
+// ---- live updates ----
+// Netlify has no push channel, so the page asks "has anything changed?" often while something is happening, and rarely when idle.
+// The question is cheap: the server compares one small revision marker and answers "unchanged" without reading any video.
+function setLive(state){const el=$("live");el.className="live"+(state==="off"?" off":state==="sync"?" sync":"");el.lastElementChild.textContent=state==="off"?"Offline, retrying":state==="sync"?"Updating":"Live"}
+function delay(){
+  if(document.hidden)return null;
+  const hot=pending.size||items.some(i=>busy(i)||waiting(i)||(i.status==="ready"&&Math.abs(new Date(i.publishAt)-Date.now())<20*6e4));
+  return hot?3000:Date.now()-lastAct>5*6e4?30000:10000;
+}
+function schedule(){clearTimeout(timer);const ms=delay();if(ms)timer=setTimeout(sync,ms)}
+async function sync(){
+  if(inflight)return;inflight=true;
+  try{
+    const r=await fetch("/api/queue"+(rev?`?rev=${encodeURIComponent(rev)}`:""),{cache:"no-store"});
+    if(!r.ok)throw 0;
+    const j=await r.json();
+    if(!j.unchanged){
+      rev=j.rev;
+      items=j.items.map(s=>pending.has(s.id)?(items.find(x=>x.id===s.id)||s):s); // a click in flight wins over older server data
+      render();
+    }
+    setLive("on");
+  }catch{
+    setLive("off");
+    if(!items.length)$("status").textContent="Couldn't load the queue. Check that your functions deployed.";
+  }
+  inflight=false;schedule();
+}
+document.addEventListener("visibilitychange",()=>{if(document.hidden)clearTimeout(timer);else sync()});
+addEventListener("focus",sync);addEventListener("online",sync);
+["pointerdown","keydown"].forEach(ev=>addEventListener(ev,()=>{lastAct=Date.now()},{passive:true}));
+setInterval(()=>{if(!document.hidden)render()},15000); // keeps "in 5m" / "3m ago" fresh between server checks
+async function ytCall(action){
+  const go=()=>fetch("/api/youtube",{method:"POST",headers:{"x-app-password":sessionStorage.pw||"","content-type":"application/json"},body:JSON.stringify({action})});
+  let r=await go();
+  if(r.status===401){sessionStorage.pw=prompt("Admin password")||"";r=await go()}
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok){alert(j.error||"Something went wrong");return null}
+  return j;
+}
+async function loadYt(banner=""){
+  let s;
+  try{s=await (await fetch("/api/youtube")).json()}catch{$("yt").textContent="Couldn't check the YouTube connection.";return}
+  let body;
+  if(!s.configured) body=`<b>YouTube sign-in isn't set up yet.</b><p>In Netlify add <code>YT_CLIENT_ID</code> and <code>YT_CLIENT_SECRET</code>, and in Google Cloud add this redirect URI to your OAuth client:</p><p><code>${esc(s.redirectUri)}</code></p>`;
+  else if(!s.connected) body=`<b class="err">YouTube isn't connected.</b> Videos will render and wait here, but can't post until you connect.<div class="acts"><button class="primary" data-y="connect">Connect YouTube</button></div>`;
+  else body=`<b class="st ${s.needsReconnect?"failed":"ready"}">${s.needsReconnect?"YouTube needs to be reconnected":"✓ YouTube connected"}</b>${s.email?` as ${esc(s.email)}`:""}${s.source==="env"?" (using the YT_REFRESH_TOKEN setting)":""}
+    <p style="color:var(--mute);margin:6px 0 0">Videos post to the channel you picked during sign-in.</p>
+    <div class="acts"><button ${s.needsReconnect?'class="primary"':""} data-y="connect">${s.needsReconnect?"Reconnect YouTube":"Switch account"}</button>${s.source==="oauth"?'<button data-y="disconnect">Disconnect</button>':""}</div>`;
+  $("yt").innerHTML=(banner?`<div class="${banner.startsWith("!")?"err":"st ready"}" style="margin-bottom:8px">${esc(banner.replace(/^!/,""))}</div>`:"")+body;
+}
+$("yt").onclick=async e=>{
+  const b=e.target.closest("button[data-y]");if(!b)return;
+  if(b.dataset.y==="connect"){const j=await ytCall("connect");if(j?.url)location.href=j.url}
+  if(b.dataset.y==="disconnect"&&confirm("Disconnect YouTube? Scheduled videos won't post until you reconnect.")){if(await ytCall("disconnect"))loadYt("YouTube disconnected.")}
+};
+const qp=new URLSearchParams(location.search);
+loadYt(qp.get("yt")==="connected"?"YouTube connected.":qp.get("yt")==="error"?"!"+(qp.get("reason")||"Sign-in failed."):"");
+if(qp.get("yt"))history.replaceState(null,"","/queue.html");
+sync();
+</script>
+</body>
+</html>

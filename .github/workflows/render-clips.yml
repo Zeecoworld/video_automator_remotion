@@ -1,0 +1,64 @@
+name: Render videos
+on:
+  repository_dispatch:
+    types: [render-videos]
+  workflow_dispatch:
+    inputs:
+      payload:
+        description: 'JSON: {"items":[{"id":"abc","idea":{"title":"...","hook":"...","short":"...","why":"...","query":"..."}}]}'
+        required: true
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Chrome dependencies for Remotion
+        run: sudo apt-get update && sudo apt-get install -y libnss3 libdbus-1-3 libatk1.0-0 libasound2t64 libxrandr2 libxkbcommon-dev libxfixes3 libxcomposite1 libxdamage1 libatk-bridge2.0-0 libpango-1.0-0 libcairo2 libcups2 libgbm1 fonts-dejavu-core
+      - name: Install dependencies (one retry, in case the npm registry has a hiccup)
+        run: npm install || (sleep 30 && npm install)
+        working-directory: worker
+      - run: node run.mjs
+        working-directory: worker
+        env:
+          PAYLOAD: ${{ github.event.client_payload.payload || inputs.payload }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
+          GEMINI_FALLBACK_MODELS: ${{ vars.GEMINI_FALLBACK_MODELS }}
+          GROQ_MODEL: ${{ vars.GROQ_MODEL }}
+          OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL }}
+          OPENROUTER_FALLBACK_MODELS: ${{ vars.OPENROUTER_FALLBACK_MODELS }}
+          CEREBRAS_MODEL: ${{ vars.CEREBRAS_MODEL }}
+          STABILITY_API_KEY: ${{ secrets.STABILITY_API_KEY }}
+          STABILITY_MODEL: ${{ vars.STABILITY_MODEL }}
+          HF_IMAGE_MODEL: ${{ vars.HF_IMAGE_MODEL }}
+          IMAGE_PROVIDERS: ${{ vars.IMAGE_PROVIDERS }}
+          IMAGES: ${{ vars.IMAGES }}
+          HF_MODEL: ${{ vars.HF_MODEL }}
+          LLM_PROVIDERS: ${{ vars.LLM_PROVIDERS }}
+          CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
+          CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
+          CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
+          NETLIFY_URL: ${{ secrets.NETLIFY_URL }}
+          WORKER_SECRET: ${{ secrets.WORKER_SECRET }}
+          GEMINI_TTS_MODEL: ${{ vars.GEMINI_TTS_MODEL }}
+          GEMINI_TTS_FALLBACK_MODELS: ${{ vars.GEMINI_TTS_FALLBACK_MODELS }}
+          TTS_VOICE: ${{ vars.TTS_VOICE }}
+          TTS_DELAY_MS: ${{ vars.TTS_DELAY_MS }}
+          CHANNEL_NAME: ${{ vars.CHANNEL_NAME }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      - name: Tell the dashboard if this run failed
+        if: ${{ always() && job.status != 'success' }}
+        run: node worker/fail-report.mjs
+        env:
+          PAYLOAD: ${{ github.event.client_payload.payload || inputs.payload }}
+          NETLIFY_URL: ${{ secrets.NETLIFY_URL }}
+          WORKER_SECRET: ${{ secrets.WORKER_SECRET }}
+          RUN_RESULT: ${{ job.status }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
